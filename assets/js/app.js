@@ -1,80 +1,202 @@
-// @TODO: YOUR CODE HERE!
 // Define SVG area dimensions
 var svgWidth = 960;
 var svgHeight = 500;
 
 // Define the chart's margins as an object
 var margin = {
-  top: 60,
-  right: 60,
-  bottom: 60,
-  left: 60
+    top:20,
+    right: 40,
+    bottom: 80,
+    left: 100
 };
 
 // Define dimensions of the chart area
-var chartWidth = svgWidth - margin.left - margin.right;
-var chartHeight = svgHeight - margin.top - margin.bottom;
+var width = svgWidth - margin.left - margin.right;
+var height = svgHeight - margin.top - margin.bottom;
 
 // Select body, append SVG area to it, and set its dimensions
-var svg = d3
-  .select("#scatter")
-  .append("svg")
-  .attr("width", svgWidth)
-  .attr("height", svgHeight);
+var svg = d3.select("#scatter")
+    .append("svg")
+    .attr("width",svgWidth)
+    .attr("height", svgHeight);
 
 // Append a group area, then set its margins
 var chartGroup = svg.append("g")
-  .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-// Load data from data.csv
-d3.csv("assets/data/data.csv").then(function(healthData) {
+var initialXAxis = "poverty";
 
-  // Print the healthData
-  console.log(healthData);
+function scale1(data1, initialXAxis) {
+     return d3.scaleLinear()
+        .domain([d3.min(data1, d=> d[initialXAxis])*0.8,
+        d3.max(data1, d => d[initialXAxis]) * 1.2
+    ])
+    .range([0,width]);
+}
 
-  // Format the date and cast the force value to a number
-  healthData.forEach(function(data) {
-    data.poverty = +data.poverty;
-    data.healthcare = +data.healthcare;
-  });
+function renderAxes1(XScale1, xAxis1) {
+    var bottomAxis = d3.axisBottom(XScale1);
 
-  // d3.extent returns the an array containing the min and max values for the property specified
-  var xLinearScale = d3.scaleLinear()
-    .domain(d3.extent(healthData, data => data.poverty))
-    .range([0, chartWidth]);
+    xAxis1.transition()
+    .duration(1000)
+    .call(bottomAxis);
 
-  // Configure a linear scale with a range between the chartHeight and 0
-  var yLinearScale = d3.scaleLinear()
-    .domain([0, d3.max(healthData, data => data.healthcare)])
-    .range([chartHeight, 0]);
+    return xAxis1
+}
 
-  // Create two new functions passing the scales in as arguments
-  // These will be used to create the chart's axes
-  var bottomAxis = d3.axisBottom(xLinearScale);
-  var leftAxis = d3.axisLeft(yLinearScale);
+function renderCircles1(circlesGroup1, XScale1, initialXAxis) {
+    circlesGroup1.transition()
+    .duration(1000)
+    .attr("cx", d => XScale1(d[initialXAxis]));
 
-  // Configure a line function which will plot the x and y coordinates using our scales
-  var drawLine = d3.line()
-    .x(data => xLinearScale(data.poverty))
-    .y(data => yLinearScale(data.healthcare));
+    return circlesGroup1;
+}
 
-  // Append an SVG path and plot its points using the line function
-  chartGroup.append("g")
-    // The drawLine function returns the instructions for creating the line for forceData
-    .attr("d", drawLine(healthData))
-    .classed("line", true);
+function ToolTip1(initialXAxis, circlesGroup1) {
+    var label;
 
-  // Append an SVG group element to the chartGroup, create the left axis inside of it
-  chartGroup.append("g")
-    .classed("axis", true)
+    if (initialXAxis === "poverty") {
+        label = "Impoverished(%)";
+    }
+    else if (xAxis1 === "age") {
+        label = "Age (Median)";
+    }
+    else {
+        label = "Household Income (Median)";
+    }
+
+    var toolTip = d3.tip()
+    .attr("class", "d3-tooltip")
+    .offset([30, -60])
+    .html(function(d){
+        var pov = "<div> "+ d.poverty + " </div>"
+        var state = "<div> "+ d.state + " </div>"
+        var obe = "<div> "+ d.obesity + " </div>"
+        return state + pov + obe;
+    });
+
+    circlesGroup1.call(toolTip);
+
+    circlesGroup1.on("mouseover", function(data1){
+        toolTip.show(data1);
+    })
+        .on("mouseout", function(data1, index){
+            toolTip.hide(data1);
+        });
+    return circlesGroup1;
+}
+
+var toolTip = d3.tip()
+    .attr("class", "d3-tooltip")
+    .offset([30, -60])
+    .html(function(d){
+        var pov = "<div> "+ d.poverty + " </div>"
+        var state = "<div> "+ d.state + " </div>"
+        var obe = "<div> "+ d.obesity + " </div>"
+        return state + pov + obe;
+    });
+
+//Import data from data.csv
+
+d3.csv("assets/data/data.csv").then(function(data,err){
+    if (err) throw err;
+
+    data.forEach(function(data){
+        data.poverty = +data.poverty;
+        data.healthcare = +data.healthcare;
+        data.age = +data.low;
+        data.smokes = +data.smokes;
+        data.income = +data.income;
+        data.obesity = +data.obesity
+    });
+
+    var xLinearScale = scale1(data, initialXAxis);
+
+    var yLinearScale = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.healthcare)])
+    .range([height,0]);
+
+    var bottomAxis = d3.axisBottom(xLinearScale);
+    var leftAxis = d3.axisLeft(yLinearScale);
+
+    var xAxis1 = chartGroup.append("g")
+    .classed("x-axis", true)
+    .attr("transform", `translate(0, ${height})`)
+    .call(bottomAxis);
+
+    chartGroup.append("g")
     .call(leftAxis);
 
-  // Append an SVG group element to the chartGroup, create the bottom axis inside of it
-  // Translate the bottom axis to the bottom of the page
-  chartGroup.append("g")
-    .classed("axis", true)
-    .attr("transform", `translate(0, ${chartHeight})`)
-    .call(bottomAxis);
-}).catch(function(error) {
-  console.log(error);
+    var circlesGroup1 = chartGroup.selectAll("g theCircles")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("cx", d => xLinearScale(d[initialXAxis]))
+    .attr("cy", d => yLinearScale(d.healthcare))
+    .attr("r",20)
+    .attr("fill", "blue")
+    .attr("opacity", ".5")
+    .on("mouseover", function(d){toolTip.show(d)})
+    .on("mouseout", function(d){toolTip.hide(d)});
+
+    var labelsGroup = chartGroup.append("g")
+    .attr("transform",`translate(${width/2}, ${height + 20})`);
+
+    var povertyLabel = labelsGroup.append("text")
+    .attr("x", 0)
+    .attr("y", 20)
+    .attr("value", "poverty")
+    .classed("active", true)
+    .text("Impoverished(%)");
+
+    var ageLabel = labelsGroup.append("text")
+    .attr("x", 0)
+    .attr("y", 40)
+    .attr("value", "age")
+    .classed("inactive", true)
+    .text("Age(Median)");
+
+    chartGroup.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 0 - margin.left)
+    .attr("x", 0 - (height/2))
+    .attr("dy", "1em")
+    .classed("axis-text", true)
+    .text("Poor Healthcare (%)");
+
+    var circlesGroup1 = ToolTip1(initialXAxis, circlesGroup1);
+
+    labelsGroup.selectAll("text")
+    .on("click", function(){
+
+        var value = d3.select(this).attr("value");
+        if (value !== initialXAxis){
+            initialXAxis = value;
+            
+            xLinearScale = scale1(data1, initialXAxis);
+
+            xAxis1 = renderAxes1(xLinearScale, xAxis1);
+
+            circlesGroup1 = renderCircles1(circlesGroup1, xLinearScale, initialXAxis);
+
+            if (initialXAxis === "age") {
+                ageLabel
+                    .classed("active", true)
+                    .classed("inactive", false);
+                povertyLabel
+                    .classed("active", false)
+                    .classed("inacitve", true);
+            }
+            else {
+                ageLabel
+                    .classed("active", false)
+                    .classed("inactive", true);
+                povertyLabel
+                    .classed("active", true)
+                    .classed("inactive", false);
+            }
+        }
+    });
+}).catch(function(err){
+    console.log(err);
 });
